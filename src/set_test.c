@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <math.h>
 #include <memory.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,6 +35,44 @@ static koh_SetAction iter_set_cmp(const void *key, int key_len, void *udata) {
     munit_assert(false);
 
     return koh_SA_next;
+}
+
+struct NumbersCtx {
+    uint32_t    *arr;
+    int         num;
+};
+
+static koh_SetAction iter_each(const void *key, int key_len, void *udata) {
+    struct NumbersCtx *ctx = udata;
+    for (int i = 0; i < ctx->num; ++i) {
+        if (ctx->arr[i] == *((uint32_t*)key))
+            return koh_SA_next;
+    }
+    munit_assert(false);
+    return koh_SA_next;
+}
+
+static MunitResult test_each(
+    const MunitParameter params[], void* data
+) {
+    uint32_t nums[] = {
+        1, 3, 5, 7, 11, 13, 15,
+    };
+    int nums_num = sizeof(nums) / sizeof(nums[0]);
+
+    koh_Set *set = set_new();
+    for (int i = 0; i< nums_num; ++i) {
+        set_add(set, &nums[i], sizeof(nums[i]));
+    }
+
+    struct NumbersCtx ctx = {
+        .arr = nums, 
+        .num = nums_num,
+    };
+    set_each(set, iter_each, &ctx);
+    set_free(set);
+
+    return MUNIT_OK;
 }
 
 static MunitResult test_compare(
@@ -160,6 +199,14 @@ static MunitTest test_suite_tests[] = {
   {
     (char*) "/new_add_exist_free",
     test_new_add_exist_free,
+    NULL,
+    NULL,
+    MUNIT_TEST_OPTION_NONE,
+    NULL
+  },
+  {
+    (char*) "/each",
+    test_each,
     NULL,
     NULL,
     MUNIT_TEST_OPTION_NONE,
