@@ -1,4 +1,4 @@
 return {
-   artifact = "strset_test",
-   main = "strset_test.c",
+   artifact = "set_test",
+   main = "set_test.c",
 }

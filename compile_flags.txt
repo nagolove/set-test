@@ -1,0 +1,14 @@
+-I../caustic/3rd_party/stb
+-I../caustic/3rd_party/genann
+-I../caustic/3rd_party/Chipmunk2D/include
+-I../caustic/3rd_party/raylib/src
+-I../caustic/3rd_party/lua/
+-I../caustic/3rd_party/utf8proc
+-I../caustic/3rd_party/small-regex/libsmallregex
+-I../caustic/3rd_party/sunvox/sunvox_lib/headers
+-I../caustic/3rd_party/rlImGui
+-I../caustic/3rd_party/cimgui
+-I../caustic/3rd_party/cimgui/generator/output
+-I../caustic/src
+-Isrc
+-I.
