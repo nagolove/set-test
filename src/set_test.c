@@ -17,23 +17,78 @@ struct Vectors {
     int     num;
 };
 
-static bool iter_set_remove(const void *key, int key_len, void *udata) {
-    return false;
+static koh_SetAction iter_set_remove(const void *key, int key_len, void *udata) {
+    return koh_SA_remove;
 }
 
-static bool iter_set_cmp(const void *key, int key_len, void *udata) {
+static koh_SetAction iter_set_cmp(const void *key, int key_len, void *udata) {
     struct Vectors *lines = udata;
 
     for (int i = 0; i < lines->num; ++i) {
         if (!memcmp(&lines->vecs[i], key, key_len)) {
-            return true;
+            return koh_SA_next;
         }
     }
 
     //printf("iter_set: key %s not found in each itertor\n", key);
     munit_assert(false);
 
-    return true;
+    return koh_SA_next;
+}
+
+static MunitResult test_compare(
+    const MunitParameter params[], void* data
+) {
+
+    Vector2 vecs1[] = {
+        { 1.,    0. },
+        { 12.,   0. },
+        { 0.1,   0. },
+        { 1.3, -0.1 },
+        { 0.,   0.5 },
+        { 14,    0. },
+    };
+    int vecs1_num = sizeof(vecs1) / sizeof(vecs1[0]);
+
+    Vector2 vecs2[] = {
+        { 1.,    0.1 },
+        { 12.,   0. },
+        { 0.1,   0.1 },
+        { 1.3, -0.1 },
+        { 0.,   0.5 },
+        { 14,    0. },
+    };
+    int vecs2_num = sizeof(vecs2) / sizeof(vecs2[0]);
+
+    koh_Set *set1 = set_new();
+    koh_Set *set2 = set_new();
+    koh_Set *set3 = set_new();
+
+    /*
+     set1 == set3
+     set1 != set2
+     */
+
+    for (int i = 0; i< vecs1_num; ++i) {
+        set_add(set1, &vecs1[i], sizeof(vecs1[0]));
+    }
+
+    for (int i = 0; i< vecs2_num; ++i) {
+        set_add(set2, &vecs2[i], sizeof(vecs2[0]));
+    }
+
+    for (int i = 0; i< vecs1_num; ++i) {
+        set_add(set3, &vecs1[i], sizeof(vecs1[0]));
+    }
+
+    munit_assert(set_compare(set1, set3));
+    munit_assert(!set_compare(set1, set2));
+
+    set_free(set1);
+    set_free(set2);
+    set_free(set3);
+
+    return MUNIT_OK;
 }
 
 static MunitResult test_new_add_exist_free(
@@ -105,6 +160,14 @@ static MunitTest test_suite_tests[] = {
   {
     (char*) "/new_add_exist_free",
     test_new_add_exist_free,
+    NULL,
+    NULL,
+    MUNIT_TEST_OPTION_NONE,
+    NULL
+  },
+  {
+    (char*) "/compare",
+    test_compare,
     NULL,
     NULL,
     MUNIT_TEST_OPTION_NONE,
