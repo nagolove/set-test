@@ -18,8 +18,10 @@ struct Vectors {
     int     num;
 };
 
-static koh_SetAction iter_set_remove(const void *key, int key_len, void *udata) {
-    return koh_SA_remove;
+static koh_SetAction iter_set_remove_all(
+    const void *key, int key_len, void *udata
+) {
+    return koh_SA_remove_next;
 }
 
 static koh_SetAction iter_set_cmp(const void *key, int key_len, void *udata) {
@@ -130,6 +132,165 @@ static MunitResult test_compare(
     return MUNIT_OK;
 }
 
+struct TestAddRemoveCtx {
+    int *examples;
+    int examples_num;
+    int examples_remove_value;
+};
+
+static koh_SetAction iter_set_remove(
+    const void *key, int key_len, void *udata
+) {
+    const int *key_value = key;
+    if (!udata) {
+        fprintf(stderr, "iter_set_check: udata == NULL\n");
+        abort();
+    }
+
+    struct TestAddRemoveCtx *ctx = udata;
+    if (*key_value == ctx->examples_remove_value) {
+        return koh_SA_break;
+    }
+    return koh_SA_break;
+}
+
+static koh_SetAction iter_set_check(
+    const void *key, int key_len, void *udata
+) {
+    const int *key_value = key;
+    if (!udata) {
+        fprintf(stderr, "iter_set_check: udata == NULL\n");
+        abort();
+    }
+
+    struct TestAddRemoveCtx *ctx = udata;
+    for (int i = 0; i < ctx->examples_num; ++i) {
+        if (ctx->examples[i] == *key_value) {
+            return koh_SA_next;
+        }
+    }
+
+    printf("iter_set_remove: key_value = %d not found\n", *key_value);
+    munit_assert(false);
+    return koh_SA_next;
+}
+
+static MunitResult test_add_remove(
+    const MunitParameter params[], void* data
+) {
+    int examples[] = {
+        1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 20, 23, 24
+    };
+    koh_Set *set = set_new();
+
+    int examples_num = sizeof(examples) / sizeof(examples[0]);
+    struct TestAddRemoveCtx ctx = {
+        .examples = calloc(sizeof(int), examples_num * 2),
+        .examples_num = examples_num,
+    };
+    assert(ctx.examples);
+    memcpy(ctx.examples, examples, sizeof(int) * examples_num);
+
+    for (int i = 0; i < examples_num; i++) {
+        set_add(set, &examples[i], sizeof(int));
+    }
+
+    set_each(set, iter_set_check, &ctx);
+
+    set_remove(set, &ctx.examples[0], sizeof(int));
+    ctx.examples[0] = 0;
+
+    set_remove(set, &ctx.examples[1], sizeof(int));
+    ctx.examples[1] = 0;
+
+    set_each(set, iter_set_check, &ctx);
+
+    ctx.examples[ctx.examples_num++] = 101;
+    set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
+
+    ctx.examples[ctx.examples_num++] = 102;
+    set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
+
+    ctx.examples[ctx.examples_num++] = 103;
+    set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
+
+    ctx.examples[ctx.examples_num++] = 104;
+    set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
+
+    ctx.examples[ctx.examples_num++] = 105;
+    set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
+
+    set_each(set, iter_set_check, &ctx);
+
+    set_remove(set, &ctx.examples[5], sizeof(int));
+    ctx.examples[5] = 0;
+
+    set_remove(set, &ctx.examples[5], sizeof(int));
+    ctx.examples[5] = 0;
+
+    set_each(set, iter_set_check, &ctx);
+
+    free(ctx.examples);
+    set_free(set);
+    return MUNIT_OK;
+}
+
+static MunitResult test_add_remove_each(
+    const MunitParameter params[], void* data
+) {
+    int examples[] = {
+        1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 20, 23, 24
+    };
+    koh_Set *set = set_new();
+
+    int examples_num = sizeof(examples) / sizeof(examples[0]);
+    struct TestAddRemoveCtx ctx = {
+        .examples = calloc(sizeof(int), examples_num * 2),
+        .examples_num = examples_num,
+    };
+    assert(ctx.examples);
+    memcpy(ctx.examples, examples, sizeof(int) * examples_num);
+
+    for (int i = 0; i < examples_num; i++) {
+        set_add(set, &examples[i], sizeof(int));
+    }
+
+    set_each(set, iter_set_check, &ctx);
+
+    set_each(set, iter_set_remove, &ctx);
+
+    set_each(set, iter_set_check, &ctx);
+
+    ctx.examples[ctx.examples_num++] = 101;
+    set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
+
+    ctx.examples[ctx.examples_num++] = 102;
+    set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
+
+    ctx.examples[ctx.examples_num++] = 103;
+    set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
+
+    ctx.examples[ctx.examples_num++] = 104;
+    set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
+
+    ctx.examples[ctx.examples_num++] = 105;
+    set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
+
+    set_each(set, iter_set_check, &ctx);
+
+    set_remove(set, &ctx.examples[5], sizeof(int));
+    ctx.examples[5] = 0;
+
+    set_remove(set, &ctx.examples[5], sizeof(int));
+    ctx.examples[5] = 0;
+
+    set_each(set, iter_set_check, &ctx);
+
+    free(ctx.examples);
+    set_free(set);
+    return MUNIT_OK;
+}
+
 static MunitResult test_new_add_exist_free(
     const MunitParameter params[], void* data
 ) {
@@ -178,7 +339,7 @@ static MunitResult test_new_add_exist_free(
     set_each(set, iter_set_cmp, &vectors_ctx);
 
     // удаление все ключей
-    set_each(set, iter_set_remove, &vectors_ctx);
+    set_each(set, iter_set_remove_all, &vectors_ctx);
 
     Vector2 pi_vec = { M_PI, M_PI };
     set_add(set, &pi_vec, sizeof(Vector2));
@@ -197,28 +358,29 @@ static MunitResult test_new_add_exist_free(
 
 static MunitTest test_suite_tests[] = {
   {
+    (char*) "/add_remove_each",
+    test_add_remove_each,
+    NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
+  },
+  {
+    (char*) "/add_remove",
+    test_add_remove,
+    NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
+  },
+  {
     (char*) "/new_add_exist_free",
     test_new_add_exist_free,
-    NULL,
-    NULL,
-    MUNIT_TEST_OPTION_NONE,
-    NULL
+    NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
   },
   {
     (char*) "/each",
     test_each,
-    NULL,
-    NULL,
-    MUNIT_TEST_OPTION_NONE,
-    NULL
+    NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
   },
   {
     (char*) "/compare",
     test_compare,
-    NULL,
-    NULL,
-    MUNIT_TEST_OPTION_NONE,
-    NULL
+    NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
   },
   { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
