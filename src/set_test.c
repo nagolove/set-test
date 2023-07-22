@@ -173,7 +173,7 @@ static koh_SetAction iter_set_check(
     struct TestAddRemoveCtx *ctx = udata;
     for (int i = 0; i < ctx->examples_num; ++i) {
         if (ctx->examples[i] == *key_value) {
-            printf("iter_set_check: found %d\n", *key_value);
+            //printf("iter_set_check: found %d\n", *key_value);
             return koh_SA_next;
         }
     }
