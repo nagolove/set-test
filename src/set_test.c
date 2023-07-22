@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "koh_common.h"
 
 struct Vectors {
     Vector2 *vecs;
@@ -133,25 +134,31 @@ static MunitResult test_compare(
 }
 
 struct TestAddRemoveCtx {
-    int *examples;
-    int examples_num;
-    int examples_remove_value;
+    int     *examples;
+    int     examples_num;
+    int     examples_remove_value;
+    bool    examples_remove_value_found;
+    koh_Set *set;
 };
 
-static koh_SetAction iter_set_remove(
+static koh_SetAction iter_set_remove_by_value(
     const void *key, int key_len, void *udata
 ) {
     const int *key_value = key;
+
     if (!udata) {
         fprintf(stderr, "iter_set_check: udata == NULL\n");
-        abort();
+        koh_trap();
     }
 
     struct TestAddRemoveCtx *ctx = udata;
+
     if (*key_value == ctx->examples_remove_value) {
-        return koh_SA_break;
+        printf("iter_set_remove: found key %d\n", *key_value);
+        ctx->examples_remove_value_found = true;
+        return koh_SA_remove_break;
     }
-    return koh_SA_break;
+    return koh_SA_next;
 }
 
 static koh_SetAction iter_set_check(
@@ -160,12 +167,13 @@ static koh_SetAction iter_set_check(
     const int *key_value = key;
     if (!udata) {
         fprintf(stderr, "iter_set_check: udata == NULL\n");
-        abort();
+        koh_trap();
     }
 
     struct TestAddRemoveCtx *ctx = udata;
     for (int i = 0; i < ctx->examples_num; ++i) {
         if (ctx->examples[i] == *key_value) {
+            printf("iter_set_check: found %d\n", *key_value);
             return koh_SA_next;
         }
     }
@@ -235,54 +243,157 @@ static MunitResult test_add_remove(
     return MUNIT_OK;
 }
 
+static void ctx_set_remove(struct TestAddRemoveCtx *ctx, int index) {
+    assert(ctx);
+
+    if (!ctx) {
+        printf("set_remove_through: ctx == NULL\n");
+        koh_trap();
+    }
+
+    assert(ctx->set);
+
+    if (!ctx->examples) {
+        printf("set_remove_through: ctx->examples == NULL\n");
+        koh_trap();
+    }
+
+    assert(index < ctx->examples_num);
+    ctx->examples_remove_value = ctx->examples[index];
+    //ctx->examples_remove_value_found = false;
+    //set_each(ctx->set, iter_set_remove_by_value, ctx);
+    set_remove(ctx->set, &ctx->examples[index], sizeof(int));
+    ctx->examples[index] = 0;
+    //if (!ctx->examples_remove_value_found) {
+        //printf("ctx->examples_remove_value: %d\n", ctx->examples_remove_value);
+        //munit_assert(ctx->examples_remove_value_found);
+    //}
+}
+
+static void ctx_set_remove_through(struct TestAddRemoveCtx *ctx, int index) {
+    assert(ctx);
+
+    if (!ctx) {
+        printf("set_remove_through: ctx == NULL\n");
+        koh_trap();
+    }
+
+    assert(ctx->set);
+
+    if (!ctx->examples) {
+        printf("set_remove_through: ctx->examples == NULL\n");
+        koh_trap();
+    }
+
+    assert(index < ctx->examples_num);
+    ctx->examples_remove_value = ctx->examples[index];
+    ctx->examples[index] = 0;
+    ctx->examples_remove_value_found = false;
+    set_each(ctx->set, iter_set_remove_by_value, ctx);
+    if (!ctx->examples_remove_value_found) {
+        printf("ctx->examples_remove_value: %d\n", ctx->examples_remove_value);
+        munit_assert(ctx->examples_remove_value_found);
+    }
+}
+
 static MunitResult test_add_remove_each(
     const MunitParameter params[], void* data
 ) {
-    int examples[] = {
-        1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 20, 23, 24
-    };
-    koh_Set *set = set_new();
 
+    int examples[] = {
+        1,  // 0
+        3,  // 1
+        4,  // 2
+        5,  // 3
+        6,  // 4
+        7,  // 5
+        8,  // 6
+        9,  // 7
+        10, // 8
+        11, // 9
+        20, // 10
+        23, // 11
+        24  // 12
+    };
+
+    koh_Set *set = set_new();
     int examples_num = sizeof(examples) / sizeof(examples[0]);
+    int examples_cap = examples_num * 10;
     struct TestAddRemoveCtx ctx = {
-        .examples = calloc(sizeof(int), examples_num * 2),
+        .examples = calloc(sizeof(int), examples_cap),
         .examples_num = examples_num,
+        .set = set,
     };
     assert(ctx.examples);
     memcpy(ctx.examples, examples, sizeof(int) * examples_num);
 
     for (int i = 0; i < examples_num; i++) {
-        set_add(set, &examples[i], sizeof(int));
+        int example_value = examples[i];
+        printf("%d ", example_value);
+        set_add(set, &example_value, sizeof(int));
+    }
+    printf("\n");
+
+    printf("set_size(set) %d\n", set_size(set));
+    munit_assert_int(set_size(set), !=, 0);
+    set_each(set, iter_set_check, &ctx);
+
+    ctx_set_remove_through(&ctx, 0);
+    ctx_set_remove_through(&ctx, 10);
+    ctx_set_remove_through(&ctx, 12);
+    ctx_set_remove_through(&ctx, 5);
+    ctx_set_remove_through(&ctx, 6);
+    ctx_set_remove_through(&ctx, 7);
+
+    set_each(set, iter_set_check, &ctx);
+
+    printf("new elements were added: ");
+    for (int j = examples_num; j < examples_num * 2; j++) {
+        ctx.examples[ctx.examples_num++] = 100 + j;
+        printf("%d ", ctx.examples[ctx.examples_num - 1]);
+        set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
+    }
+    printf("\n");
+
+    for (int i = 0; i < ctx.examples_num; i++) {
+        int example_value = ctx.examples[i];
+        printf("%d ", example_value);
+    }
+    printf("\n");
+
+    for (int j = examples_num - 1; j < examples_num / 2; j--) {
+        printf("j %d, ctx.examples[%d] = %d\n", j, j, ctx.examples[j]);
+        if (ctx.examples[j])
+            ctx_set_remove_through(&ctx, j);
     }
 
-    set_each(set, iter_set_check, &ctx);
-
-    set_each(set, iter_set_remove, &ctx);
-
-    set_each(set, iter_set_check, &ctx);
-
-    ctx.examples[ctx.examples_num++] = 101;
+    ctx.examples[ctx.examples_num++] = 1102;
     set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
 
-    ctx.examples[ctx.examples_num++] = 102;
+    ctx.examples[ctx.examples_num++] = 1103;
     set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
 
-    ctx.examples[ctx.examples_num++] = 103;
+    ctx.examples[ctx.examples_num++] = 1104;
     set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
 
-    ctx.examples[ctx.examples_num++] = 104;
-    set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
-
-    ctx.examples[ctx.examples_num++] = 105;
+    ctx.examples[ctx.examples_num++] = 1105;
     set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
 
     set_each(set, iter_set_check, &ctx);
 
-    set_remove(set, &ctx.examples[5], sizeof(int));
-    ctx.examples[5] = 0;
+    ctx_set_remove(&ctx, ctx.examples_num - 1);
+    ctx.examples_num--;
+    ctx_set_remove(&ctx, ctx.examples_num - 1);
+    ctx.examples_num--;
+    ctx_set_remove(&ctx, ctx.examples_num - 1);
+    ctx.examples_num--;
+    ctx_set_remove(&ctx, ctx.examples_num - 1);
+    ctx.examples_num--;
 
-    set_remove(set, &ctx.examples[5], sizeof(int));
-    ctx.examples[5] = 0;
+    for (int i = 0; i < ctx.examples_num; i++) {
+        printf("%d ", ctx.examples[i]);
+    }
+    printf("\n");
 
     set_each(set, iter_set_check, &ctx);
 
