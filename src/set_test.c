@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <math.h>
 #include <memory.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,6 +75,118 @@ static MunitResult test_each(
     };
     set_each(set, iter_each, &ctx);
     set_free(set);
+
+    return MUNIT_OK;
+}
+
+void test_each_view_int_arr(int *arr, int arr_len) {
+    assert(arr);
+
+    int *examples = arr;
+    int examples_num = arr_len;
+
+    bool examples_exists[examples_num];
+    memset(examples_exists, 0, sizeof(examples_exists));
+
+    koh_Set *set = set_new();
+
+    for (int j = 0; j < examples_num; ++j) {
+        set_add(set, &examples[j], sizeof(int));
+    }
+
+    printf("set_size = %d\n", set_size(set));
+
+    bool verbose_printing = koh_set_view_verbose;
+    struct koh_SetView v = set_each_begin(set);
+    koh_set_view_verbose = false;
+    while (set_each_valid(&v)) {
+        const int *key = set_each_key(&v);
+        printf("key %p\n", key);
+        if (key)
+            printf("%d ", *key);
+        set_each_next(&v);
+    }
+    printf("\n");
+    koh_set_view_verbose = verbose_printing;
+
+    /*
+    индекс      taken
+    ------------------
+    0           false           
+    1           false
+    2           false
+    3           true        <- set_each_begin()
+    4           false
+    5           true        <- set_each_next()
+     */
+
+    for (struct koh_SetView v = set_each_begin(set); 
+            // может быть вызван много раз, (инвариат цикла?)
+            set_each_valid(&v);
+            // двигает состояние цикла к следующей записи
+            set_each_next(&v)) {
+        const int *key = set_each_key(&v);
+        munit_assert_ptr_not_null(key);
+
+        for (int i = 0; i < examples_num; i++) {
+            if (examples[i] == *key) {
+                examples_exists[i] = true;
+            }
+        }
+
+        munit_assert_int(set_each_key_len(&v), ==, sizeof(int));
+    }
+
+    int exists_num = 0;
+    for (int i = 0; i < examples_num; i++) {
+        printf("[%d] = %d ", i, examples[i]);
+        if (examples_exists[i]) {
+            exists_num++;
+            koh_term_color_set(KOH_TERM_MAGENTA);
+            printf("✔, ");
+            koh_term_color_reset();
+        } else {
+            koh_term_color_set(KOH_TERM_RED);
+            printf("🞬, ");
+            koh_term_color_reset();
+        }
+    }
+
+    printf("exists_num %d, examples_num %d\n", exists_num, examples_num);
+    munit_assert(exists_num == examples_num);
+
+    set_free(set);
+}
+
+static MunitResult test_each_view(
+    const MunitParameter params[], void* data
+) {
+    int arr_len;
+
+    {
+        int arr1[] = { 0, 1, 2, 3, 4, 5};
+        arr_len = sizeof(arr1) / sizeof(arr1[0]);;
+        test_each_view_int_arr(arr1, arr_len);
+    }
+
+    {
+        int arr2[] = { -5, 5, -6, 6,};
+        arr_len = sizeof(arr2) / sizeof(arr2[0]);;
+        test_each_view_int_arr(arr2, arr_len);
+    }
+
+    {
+        int arr3[] = { 111 };
+        arr_len = sizeof(arr3) / sizeof(arr3[0]);;
+        test_each_view_int_arr(arr3, arr_len);
+    }
+
+    {
+        int arr4[] = { };
+        // 11, 13, 5
+        arr_len = sizeof(arr4) / sizeof(arr4[0]);;
+        test_each_view_int_arr(arr4, arr_len);
+    }
 
     return MUNIT_OK;
 }
@@ -468,6 +581,11 @@ static MunitResult test_new_add_exist_free(
 }
 
 static MunitTest test_suite_tests[] = {
+  {
+    (char*) "/each_view",
+    test_each_view,
+    NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
+  },
   {
     (char*) "/add_remove_each",
     test_add_remove_each,
