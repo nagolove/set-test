@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+gdb --args ./set_test set/each_view --no-fork
