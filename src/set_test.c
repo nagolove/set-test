@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "koh_common.h"
+#include "koh_metaloader.h"
 
 struct Vectors {
     Vector2 *vecs;
@@ -94,19 +95,25 @@ void test_each_view_int_arr(int *arr, int arr_len) {
         set_add(set, &examples[j], sizeof(int));
     }
 
-    printf("set_size = %d\n", set_size(set));
+    bool use_print = false;
+    if (use_print)
+        printf("set_size = %d\n", set_size(set));
 
     bool verbose_printing = koh_set_view_verbose;
     struct koh_SetView v = set_each_begin(set);
     koh_set_view_verbose = false;
     while (set_each_valid(&v)) {
         const int *key = set_each_key(&v);
-        printf("key %p\n", key);
-        if (key)
-            printf("%d ", *key);
+        if (use_print)
+            printf("key %p\n", key);
+        if (key) {
+            if (use_print)
+                printf("%d ", *key);
+        }
         set_each_next(&v);
     }
-    printf("\n");
+    if (use_print)
+        printf("\n");
     koh_set_view_verbose = verbose_printing;
 
     /*
@@ -191,7 +198,7 @@ static MunitResult test_each_view(
     return MUNIT_OK;
 }
 
-static MunitResult test_compare(
+static MunitResult test_compare_1(
     const MunitParameter params[], void* data
 ) {
 
@@ -246,6 +253,171 @@ static MunitResult test_compare(
     return MUNIT_OK;
 }
 
+struct MetaObject {
+    Rectangle   rect;
+    char        name[128];
+};
+
+static koh_Set *control_set_alloc(struct MetaLoaderObjects objs) {
+    koh_Set *set_control = set_new();
+    assert(set_control);
+
+    for (int i = 0; i < objs.num; ++i) {
+        struct MetaObject mobject = {};
+        strncpy(mobject.name, objs.names[i], sizeof(mobject.name));
+        mobject.rect = objs.rects[i];
+        /*
+        printf(
+            "control_set_alloc: mobject '%s', %s\n",
+            mobject.name, rect2str(mobject.rect)
+        );
+        */
+        set_add(set_control, &mobject, sizeof(mobject));
+    }
+
+    return set_control;
+}
+
+static MunitResult test_compare_3_noeq(
+    const MunitParameter params[], void* data
+) {
+
+    koh_Set *set1 = control_set_alloc((struct MetaLoaderObjects) {
+        .names = { 
+            // Изменено здесь ↓
+            "", 
+            // Изменено здесь ↑ 
+
+            "mine"  , "wheel2", "wheel3", "wheel4", "wheel5", 
+        },
+        .rects = {
+            { 0, 0, 100, 100, },
+            { 2156, 264, 407, 418 },
+            { 2, 20, 43, 43, },
+            { 2000, 20, 43, 43, },
+            { -20, 20, 43, 43, },
+            { 0, 0, 0, 0},
+        },
+        .num = 6,
+    });
+
+    koh_Set *set2 = control_set_alloc((struct MetaLoaderObjects) {
+        .names = { 
+            "wheel1", "mine"  , "wheel2", "wheel3", "wheel4", "wheel5", 
+        },
+        .rects = {
+            { 0, 0, 100, 100, },
+            { 2156, 264, 407, 418 },
+            { 2, 20, 43, 43, },
+            { 2000, 20, 43, 43, },
+            { -20, 20, 43, 43, },
+            { 0, 0, 0, 0},
+        },
+        .num = 6,
+    });
+
+    munit_assert_false(set_compare(set1, set2));
+
+    if (set1)
+        set_free(set1);
+    if (set2)
+        set_free(set2);
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_compare_2_noeq(
+    const MunitParameter params[], void* data
+) {
+
+    koh_Set *set1 = control_set_alloc((struct MetaLoaderObjects) {
+        .names = { 
+            // Изменено здесь ↓
+            "wh_el1", 
+            // Изменено здесь ↑ 
+
+            "mine"  , "wheel2", "wheel3", "wheel4", "wheel5", 
+        },
+        .rects = {
+            { 0, 0, 100, 100, },
+            { 2156, 264, 407, 418 },
+            { 2, 20, 43, 43, },
+            { 2000, 20, 43, 43, },
+            { -20, 20, 43, 43, },
+            { 0, 0, 0, 0},
+        },
+        .num = 6,
+    });
+
+    koh_Set *set2 = control_set_alloc((struct MetaLoaderObjects) {
+        .names = { 
+            "wheel1", "mine"  , "wheel2", "wheel3", "wheel4", "wheel5", 
+        },
+        .rects = {
+            { 0, 0, 100, 100, },
+            { 2156, 264, 407, 418 },
+            { 2, 20, 43, 43, },
+            { 2000, 20, 43, 43, },
+            { -20, 20, 43, 43, },
+            { 0, 0, 0, 0},
+        },
+        .num = 6,
+    });
+
+    munit_assert_false(set_compare(set1, set2));
+
+    if (set1)
+        set_free(set1);
+    if (set2)
+        set_free(set2);
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_compare_2_eq(
+    const MunitParameter params[], void* data
+) {
+
+    koh_Set *set1 = control_set_alloc((struct MetaLoaderObjects) {
+        .names = { 
+            "wheel1", "mine"  , "wheel2", "wheel3", "wheel4", "wheel5", 
+        },
+        .rects = {
+            { 0, 0, 100, 100, },
+            { 2156, 264, 407, 418 },
+            { 2, 20, 43, 43, },
+            { 2000, 20, 43, 43, },
+            { -20, 20, 43, 43, },
+            { 0, 0, 0, 0},
+        },
+        .num = 6,
+    });
+
+    koh_Set *set2 = control_set_alloc((struct MetaLoaderObjects) {
+        .names = { 
+            "wheel1", "mine"  , "wheel2", "wheel3", "wheel4", "wheel5", 
+        },
+        .rects = {
+            { 0, 0, 100, 100, },
+            { 2156, 264, 407, 418 },
+            { 2, 20, 43, 43, },
+            { 2000, 20, 43, 43, },
+            { -20, 20, 43, 43, },
+            { 0, 0, 0, 0},
+        },
+        .num = 6,
+    });
+
+    munit_assert(set_compare(set1, set2));
+
+    if (set1)
+        set_free(set1);
+    if (set2)
+        set_free(set2);
+
+    return MUNIT_OK;
+}
+
 struct TestAddRemoveCtx {
     int     *examples;
     int     examples_num;
@@ -267,7 +439,7 @@ static koh_SetAction iter_set_remove_by_value(
     struct TestAddRemoveCtx *ctx = udata;
 
     if (*key_value == ctx->examples_remove_value) {
-        printf("iter_set_remove: found key %d\n", *key_value);
+        /*printf("iter_set_remove: found key %d\n", *key_value);*/
         ctx->examples_remove_value_found = true;
         return koh_SA_remove_break;
     }
@@ -460,12 +632,16 @@ static MunitResult test_add_remove_each(
 
     set_each(set, iter_set_check, &ctx);
 
-    printf("new elements were added: ");
+    bool use_print = false;
+    if (use_print)
+        printf("new elements were added: ");
     for (int j = examples_num; j < examples_num * 2; j++) {
         ctx.examples[ctx.examples_num++] = 100 + j;
-        printf("%d ", ctx.examples[ctx.examples_num - 1]);
+        if (use_print)
+            printf("%d ", ctx.examples[ctx.examples_num - 1]);
         set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
     }
+    if (use_print)
     printf("\n");
 
     for (int i = 0; i < ctx.examples_num; i++) {
@@ -607,8 +783,23 @@ static MunitTest test_suite_tests[] = {
     NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
   },
   {
-    (char*) "/compare",
-    test_compare,
+    (char*) "/compare_1",
+    test_compare_1,
+    NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
+  },
+  {
+    (char*) "/compare_2_eq",
+    test_compare_2_eq,
+    NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
+  },
+  {
+    (char*) "/compare_2_noeq",
+    test_compare_2_noeq,
+    NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
+  },
+  {
+    (char*) "/compare_3_noeq",
+    test_compare_3_noeq,
     NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
   },
   { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
