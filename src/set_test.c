@@ -278,6 +278,50 @@ static koh_Set *control_set_alloc(struct MetaLoaderObjects objs) {
     return set_control;
 }
 
+static MunitResult test_compare_4_noeq(
+    const MunitParameter params[], void* data
+) {
+
+    koh_Set *set1 = control_set_alloc((struct MetaLoaderObjects) {
+        .names = { 
+            "wheel1", "mine"  , "wheel2", "wheel3", "wheel4", "wheel5", 
+        },
+        .rects = {
+            { 0, 0, 100, 100, },
+            { 2156, 264, 407, 418 },
+            { 2, 20, 43, 43, },
+            { 2000, 20, 43, 43, },
+            { -20, 20, 43, 43, },
+            { 0, 0.01, 0, 0},
+        },
+        .num = 5,   // изменено количество
+    });
+
+    koh_Set *set2 = control_set_alloc((struct MetaLoaderObjects) {
+        .names = { 
+            "wheel1", "mine"  , "wheel2", "wheel3", "wheel4", "wheel5", 
+        },
+        .rects = {
+            { 0, 0, 100, 100, },
+            { 2156, 264, 407, 418 },
+            { 2, 20, 43, 43, },
+            { 2000, 20, 43, 43, },
+            { -20, 20, 43, 43, },
+            { 0, 0, 0, 0},
+        },
+        .num = 6,
+    });
+
+    munit_assert_false(set_compare(set1, set2));
+
+    if (set1)
+        set_free(set1);
+    if (set2)
+        set_free(set2);
+
+    return MUNIT_OK;
+}
+
 static MunitResult test_compare_3_noeq(
     const MunitParameter params[], void* data
 ) {
@@ -800,6 +844,11 @@ static MunitTest test_suite_tests[] = {
   {
     (char*) "/compare_3_noeq",
     test_compare_3_noeq,
+    NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
+  },
+  {
+    (char*) "/compare_4_noeq",
+    test_compare_4_noeq,
     NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
   },
   { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
