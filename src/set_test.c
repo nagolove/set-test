@@ -16,6 +16,8 @@
 #include "koh_common.h"
 #include "koh_metaloader.h"
 
+static const bool verbose = false;
+
 struct Vectors {
     Vector2 *vecs;
     int     num;
@@ -95,7 +97,7 @@ void test_each_view_int_arr(int *arr, int arr_len) {
         set_add(set, &examples[j], sizeof(int));
     }
 
-    bool use_print = false;
+    bool use_print = verbose;
     if (use_print)
         printf("set_size = %d\n", set_size(set));
 
@@ -146,20 +148,24 @@ void test_each_view_int_arr(int *arr, int arr_len) {
 
     int exists_num = 0;
     for (int i = 0; i < examples_num; i++) {
-        printf("[%d] = %d ", i, examples[i]);
+        if (verbose)
+            printf("[%d] = %d ", i, examples[i]);
         if (examples_exists[i]) {
             exists_num++;
             koh_term_color_set(KOH_TERM_MAGENTA);
-            printf("✔, ");
+            if (verbose)
+                printf("✔, ");
             koh_term_color_reset();
         } else {
             koh_term_color_set(KOH_TERM_RED);
-            printf("🞬, ");
+            if (verbose)
+                printf("🞬, ");
             koh_term_color_reset();
         }
     }
 
-    printf("exists_num %d, examples_num %d\n", exists_num, examples_num);
+    if (verbose)
+        printf("exists_num %d, examples_num %d\n", exists_num, examples_num);
     munit_assert(exists_num == examples_num);
 
     set_free(set);
@@ -507,7 +513,8 @@ static koh_SetAction iter_set_check(
         }
     }
 
-    printf("iter_set_remove: key_value = %d not found\n", *key_value);
+    if (verbose)
+        printf("iter_set_remove: key_value = %d not found\n", *key_value);
     munit_assert(false);
     return koh_SA_next;
 }
@@ -576,19 +583,26 @@ static void ctx_set_remove(struct TestAddRemoveCtx *ctx, int index) {
     assert(ctx);
 
     if (!ctx) {
-        printf("set_remove_through: ctx == NULL\n");
+        if (verbose)
+            printf("set_remove_through: ctx == NULL\n");
         koh_trap();
     }
 
     assert(ctx->set);
 
     if (!ctx->examples) {
-        printf("set_remove_through: ctx->examples == NULL\n");
+        if (verbose)
+            printf("set_remove_through: ctx->examples == NULL\n");
         koh_trap();
     }
 
     assert(index < ctx->examples_num);
-    ctx->examples_remove_value = ctx->examples[index];
+    if (ctx->examples)
+        ctx->examples_remove_value = ctx->examples[index];
+    else {
+        printf("ctx_set_removce: ctx->examples == NULL\n");
+        exit(EXIT_FAILURE);
+    }
     //ctx->examples_remove_value_found = false;
     //set_each(ctx->set, iter_set_remove_by_value, ctx);
     set_remove(ctx->set, &ctx->examples[index], sizeof(int));
@@ -620,7 +634,11 @@ static void ctx_set_remove_through(struct TestAddRemoveCtx *ctx, int index) {
     ctx->examples_remove_value_found = false;
     set_each(ctx->set, iter_set_remove_by_value, ctx);
     if (!ctx->examples_remove_value_found) {
-        printf("ctx->examples_remove_value: %d\n", ctx->examples_remove_value);
+        if (verbose)
+            printf(
+                "ctx->examples_remove_value: %d\n",
+                ctx->examples_remove_value
+            );
         munit_assert(ctx->examples_remove_value_found);
     }
 }
@@ -658,12 +676,14 @@ static MunitResult test_add_remove_each(
 
     for (int i = 0; i < examples_num; i++) {
         int example_value = examples[i];
-        printf("%d ", example_value);
+        if (verbose)
+            printf("%d ", example_value);
         set_add(set, &example_value, sizeof(int));
     }
-    printf("\n");
-
-    printf("set_size(set) %d\n", set_size(set));
+    if (verbose) {
+        printf("\n");
+        printf("set_size(set) %d\n", set_size(set));
+    }
     munit_assert_int(set_size(set), !=, 0);
     set_each(set, iter_set_check, &ctx);
 
@@ -686,16 +706,20 @@ static MunitResult test_add_remove_each(
         set_add(set, &ctx.examples[ctx.examples_num - 1], sizeof(int));
     }
     if (use_print)
-    printf("\n");
+        printf("\n");
 
-    for (int i = 0; i < ctx.examples_num; i++) {
-        int example_value = ctx.examples[i];
-        printf("%d ", example_value);
+    // XXX: Что показывают эти цифры?
+    if (verbose) {
+        for (int i = 0; i < ctx.examples_num; i++) {
+            int example_value = ctx.examples[i];
+            printf("%d ", example_value);
+        }
+        printf("\n");
     }
-    printf("\n");
 
     for (int j = examples_num - 1; j < examples_num / 2; j--) {
-        printf("j %d, ctx.examples[%d] = %d\n", j, j, ctx.examples[j]);
+        if (verbose)
+            printf("j %d, ctx.examples[%d] = %d\n", j, j, ctx.examples[j]);
         if (ctx.examples[j])
             ctx_set_remove_through(&ctx, j);
     }
@@ -723,10 +747,12 @@ static MunitResult test_add_remove_each(
     ctx_set_remove(&ctx, ctx.examples_num - 1);
     ctx.examples_num--;
 
-    for (int i = 0; i < ctx.examples_num; i++) {
-        printf("%d ", ctx.examples[i]);
+    if (verbose) {
+        for (int i = 0; i < ctx.examples_num; i++) {
+            printf("%d ", ctx.examples[i]);
+        }
+        printf("\n");
     }
-    printf("\n");
 
     set_each(set, iter_set_check, &ctx);
 
